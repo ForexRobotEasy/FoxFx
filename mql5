@@ -1,0 +1,163 @@
+
+// Developer: Forex Robot Easy Team
+// Website: forexroboteasy.com
+
+// FoxFx Trading Robot
+
+// Include necessary libraries and indicators
+#include <Trade\Trade.mqh>
+#include <Indicators\Oscillators\RSI.mqh>
+#include <Indicators\Trend\BollingerBands.mqh>
+#include <Indicators\Oscillators\DoubleStochastic.mqh>
+
+// Define constants for grid trading
+#define GRID_SIZE 10
+#define GRID_INTERVAL 100
+
+// Define constants for profit-centric closing mechanism
+#define PROFIT_THRESHOLD 50
+#define TRAILING_STOP 10
+
+// Define global variables
+CTrade trade;
+CRSI rsi;
+CBollingerBands bollingerBands;
+CDoubleStochastic doubleStochastic;
+
+// Initialize the trading robot
+int OnInit()
+{
+    // Set up RSI indicator parameters
+    rsi.Init(Symbol(), PERIOD_H1, 14, PRICE_CLOSE);
+
+    // Set up Bollinger Bands indicator parameters
+    bollingerBands.Init(Symbol(), PERIOD_H4, 20, 2, PRICE_CLOSE);
+
+    // Set up Double Stochastic indicator parameters
+    doubleStochastic.Init(Symbol(), PERIOD_D1, 5, 3, 3, MODE_SMA, MODE_SMA, PRICE_CLOSE);
+
+    return(INIT_SUCCEEDED);
+}
+
+// Start trading
+void OnTick()
+{
+    // Check if it's time to place a trade based on grid interval
+    if (TimeCurrent() % GRID_INTERVAL == 0)
+    {
+        // Calculate grid levels
+        double gridLevels[GRID_SIZE];
+        double currentPrice = SymbolInfoDouble(Symbol(), SYMBOL_BID);
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            gridLevels[i] = currentPrice - (i * Point * GRID_SIZE);
+        }
+
+        // Place trades at grid levels
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            // Check if the current price is above the upper Bollinger Band
+            if (currentPrice > bollingerBands.TopBuffer[i])
+            {
+                // Check if the RSI is oversold
+                if (rsi.MainBuffer[i] < 30)
+                {
+                    // Check if the Double Stochastic is below the oversold level
+                    if (doubleStochastic.MainBuffer[i] < 20)
+                    {
+                        // Open a buy order at the current grid level
+                        trade.Buy(Lots, gridLevels[i], 0, 0, 'Grid Buy');
+                    }
+                }
+            }
+            // Check if the current price is below the lower Bollinger Band
+            else if (currentPrice < bollingerBands.BottomBuffer[i])
+            {
+                // Check if the RSI is overbought
+                if (rsi.MainBuffer[i] > 70)
+                {
+                    // Check if the Double Stochastic is above the overbought level
+                    if (doubleStochastic.MainBuffer[i] > 80)
+                    {
+                        // Open a sell order at the current grid level
+                        trade.Sell(Lots, gridLevels[i], 0, 0, 'Grid Sell');
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for profit-centric closing mechanism
+    for (int i = 0; i < OrdersTotal(); i++)
+    {
+        if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+        {
+            double profit = OrderProfit();
+            double stopLoss = OrderStopLoss();
+            
+            // Check if the profit is above the threshold
+            if (profit > PROFIT_THRESHOLD)
+            {
+                // Set a trailing stop loss
+                trade.ModifyStopLoss(stopLoss, stopLoss - TRAILING_STOP);
+            }
+        }
+    }
+}
+
+// Handle errors and exceptions
+void OnTradeError(const int code)
+{
+    Print('Trade error: ', code);
+}
+
+// Validate and sanitize input data
+bool ValidateInputData()
+{
+    // Validate and sanitize input data here
+    return true;
+}
+
+// Log and debug information
+void LogDebugInfo()
+{
+    // Log and debug information here
+}
+
+// User-friendly interface
+void OnChartEvent(const int id, const long& lparam, const double& dparam, const string& sparam)
+{
+    // Handle user input and events here
+}
+
+// Proper documentation
+string GetDocumentation()
+{
+    // Return the documentation for the trading robot
+    return 'FoxFx Trading Robot Documentation';
+}
+
+// Test the code
+void TestCode()
+{
+    // Perform code testing here
+}
+
+// Main program entry point
+int start()
+{
+    // Validate input data
+    if (!ValidateInputData())
+    {
+        Print('Invalid input data');
+        return 0;
+    }
+
+    // Log debug information
+    LogDebugInfo();
+
+    // Start trading
+    OnTick();
+
+    return 0;
+}
